@@ -134,3 +134,4 @@
 ## 详细设计文档
 
 - `docs/PROJECT_DESIGN_CN.md`
+- `docs/BACKEND_DESIGN_DOC.md`
