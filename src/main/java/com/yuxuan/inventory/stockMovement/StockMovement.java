@@ -14,11 +14,11 @@ public class StockMovement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(optional = false)
     @JoinColumn(name = "warehouse_id", nullable = false)
     private Warehouse warehouse;
 
-    @ManyToOne
+    @ManyToOne(optional = false)
     @JoinColumn(name = "item_id", nullable = false)
     private Item item;
 
@@ -40,26 +40,51 @@ public class StockMovement {
         this.createdAt = Instant.now();
     }
 
-    public void setWarehouse(Warehouse warehouse) {
-        this.warehouse=warehouse;
+    public Long getId() {
+        return id;
+    }
 
+    public Warehouse getWarehouse() {
+        return warehouse;
+    }
+
+    public void setWarehouse(Warehouse warehouse) {
+        this.warehouse = warehouse;
+    }
+
+    public Item getItem() {
+        return item;
     }
 
     public void setItem(Item item) {
-        this.item=item;
+        this.item = item;
+    }
+
+    public MovementType getType() {
+        return type;
     }
 
     public void setType(MovementType type) {
-        this.type=type;
+        this.type = type;
+    }
+
+    public long getDelta() {
+        return delta;
     }
 
     public void setDelta(long delta) {
-        this.delta=delta;
+        this.delta = delta;
+    }
+
+    public String getReason() {
+        return reason;
     }
 
     public void setReason(String reason) {
-        this.reason =reason;
+        this.reason = reason;
     }
 
-    // getter/setter
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
 }
