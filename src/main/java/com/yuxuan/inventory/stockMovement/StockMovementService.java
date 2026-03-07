@@ -91,7 +91,7 @@ public class StockMovementService {
 
     @Transactional
     public StockMovement post(Long movementId, UserRole role, String operator) {
-        StockMovement movement = stockMovementRepository.findById(movementId)
+        StockMovement movement = stockMovementRepository.findByIdForUpdate(movementId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Stock movement not found"));
 
         if (movement.getStatus() == MovementStatus.CANCELLED) {
@@ -120,7 +120,7 @@ public class StockMovementService {
 
     @Transactional
     public StockMovement cancel(Long movementId, UserRole role, String operator) {
-        StockMovement movement = stockMovementRepository.findById(movementId)
+        StockMovement movement = stockMovementRepository.findByIdForUpdate(movementId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Stock movement not found"));
 
         if (movement.getStatus() == MovementStatus.POSTED) {

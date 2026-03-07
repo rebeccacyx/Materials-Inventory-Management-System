@@ -77,7 +77,8 @@ public class OutboundOrderService {
 
     @Transactional
     public OutboundOrder post(Long id, String operator) {
-        OutboundOrder order = getById(id);
+        OutboundOrder order = outboundOrderRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Outbound order not found"));
 
         if (order.getStatus() == OutboundOrderStatus.POSTED) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Order already posted");

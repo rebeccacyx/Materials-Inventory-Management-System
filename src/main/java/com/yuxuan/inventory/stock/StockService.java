@@ -53,7 +53,7 @@ public class StockService {
     }
 
     public long getAvailableQuantity(Long warehouseId, Long itemId) {
-        return stockRepository.findByWarehouseIdAndItemId(warehouseId, itemId)
+        return stockRepository.findByWarehouseIdAndItemIdForUpdate(warehouseId, itemId)
                 .map(Stock::getQuantity)
                 .orElse(0L);
     }
@@ -78,7 +78,7 @@ public class StockService {
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Item not found"));
 
-        Stock stock = stockRepository.findByWarehouseIdAndItemId(warehouseId, itemId)
+        Stock stock = stockRepository.findByWarehouseIdAndItemIdForUpdate(warehouseId, itemId)
                 .orElseGet(() -> {
                     Stock s = new Stock();
                     s.setWarehouse(warehouse);
@@ -114,7 +114,7 @@ public class StockService {
         Long warehouseId = movement.getWarehouse().getId();
         Long itemId = movement.getItem().getId();
 
-        Stock stock = stockRepository.findByWarehouseIdAndItemId(warehouseId, itemId)
+        Stock stock = stockRepository.findByWarehouseIdAndItemIdForUpdate(warehouseId, itemId)
                 .orElseGet(() -> {
                     Stock s = new Stock();
                     s.setWarehouse(movement.getWarehouse());
