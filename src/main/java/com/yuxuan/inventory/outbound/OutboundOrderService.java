@@ -3,6 +3,7 @@ package com.yuxuan.inventory.outbound;
 import com.yuxuan.inventory.common.ApiException;
 import com.yuxuan.inventory.item.Item;
 import com.yuxuan.inventory.item.ItemRepository;
+import com.yuxuan.inventory.stock.StockService;
 import com.yuxuan.inventory.stockMovement.MovementType;
 import com.yuxuan.inventory.warehouse.Warehouse;
 import com.yuxuan.inventory.warehouse.WarehouseRepository;
@@ -11,6 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class OutboundOrderService {
@@ -18,12 +22,12 @@ public class OutboundOrderService {
     private final OutboundOrderRepository outboundOrderRepository;
     private final WarehouseRepository warehouseRepository;
     private final ItemRepository itemRepository;
-    private final com.yuxuan.inventory.stock.StockService stockService;
+    private final StockService stockService;
 
     public OutboundOrderService(OutboundOrderRepository outboundOrderRepository,
                                 WarehouseRepository warehouseRepository,
                                 ItemRepository itemRepository,
-                                com.yuxuan.inventory.stock.StockService stockService) {
+                                StockService stockService) {
         this.outboundOrderRepository = outboundOrderRepository;
         this.warehouseRepository = warehouseRepository;
         this.itemRepository = itemRepository;
@@ -31,13 +35,14 @@ public class OutboundOrderService {
     }
 
     @Transactional
-    public OutboundOrder create(CreateOutboundOrderRequest request) {
+    public OutboundOrder create(CreateOutboundOrderRequest request, String operator) {
         Warehouse warehouse = warehouseRepository.findById(request.warehouseId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Warehouse not found"));
 
         OutboundOrder order = new OutboundOrder();
         order.setWarehouse(warehouse);
         order.setStatus(OutboundOrderStatus.DRAFT);
+        order.setCreatedBy(normalizeOperator(operator));
 
         for (CreateOutboundOrderLineRequest lineRequest : request.lines()) {
             Item item = itemRepository.findById(lineRequest.itemId())
@@ -52,17 +57,37 @@ public class OutboundOrderService {
         return outboundOrderRepository.save(order);
     }
 
+    public List<OutboundOrder> query(Long warehouseId, OutboundOrderStatus status) {
+        if (warehouseId != null && status != null) {
+            return outboundOrderRepository.findByWarehouseIdAndStatus(warehouseId, status);
+        }
+        if (warehouseId != null) {
+            return outboundOrderRepository.findByWarehouseId(warehouseId);
+        }
+        if (status != null) {
+            return outboundOrderRepository.findByStatus(status);
+        }
+        return outboundOrderRepository.findAll();
+    }
+
     public OutboundOrder getById(Long id) {
         return outboundOrderRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Outbound order not found"));
     }
 
     @Transactional
-    public OutboundOrder post(Long id) {
-        OutboundOrder order = getById(id);
+    public OutboundOrder post(Long id, String operator) {
+        OutboundOrder order = outboundOrderRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Outbound order not found"));
 
         if (order.getStatus() == OutboundOrderStatus.POSTED) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Order already posted");
+        }
+
+        Map<Long, Long> requiredByItem = order.getLines().stream()
+                .collect(Collectors.groupingBy(line -> line.getItem().getId(), Collectors.summingLong(OutboundOrderLine::getQuantity)));
+        for (Map.Entry<Long, Long> entry : requiredByItem.entrySet()) {
+            stockService.ensureSufficientStock(order.getWarehouse().getId(), entry.getKey(), entry.getValue());
         }
 
         for (OutboundOrderLine line : order.getLines()) {
@@ -72,12 +97,18 @@ public class OutboundOrderService {
                     MovementType.OUT,
                     line.getQuantity(),
                     null,
-                    "outbound-order:" + order.getId()
+                    "outbound-order:" + order.getId(),
+                    normalizeOperator(operator)
             );
         }
 
         order.setStatus(OutboundOrderStatus.POSTED);
+        order.setPostedBy(normalizeOperator(operator));
         order.setPostedAt(Instant.now());
         return outboundOrderRepository.save(order);
+    }
+
+    private String normalizeOperator(String operator) {
+        return (operator == null || operator.isBlank()) ? "system" : operator.trim();
     }
 }
