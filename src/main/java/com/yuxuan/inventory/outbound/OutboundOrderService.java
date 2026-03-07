@@ -35,13 +35,14 @@ public class OutboundOrderService {
     }
 
     @Transactional
-    public OutboundOrder create(CreateOutboundOrderRequest request) {
+    public OutboundOrder create(CreateOutboundOrderRequest request, String operator) {
         Warehouse warehouse = warehouseRepository.findById(request.warehouseId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Warehouse not found"));
 
         OutboundOrder order = new OutboundOrder();
         order.setWarehouse(warehouse);
         order.setStatus(OutboundOrderStatus.DRAFT);
+        order.setCreatedBy(normalizeOperator(operator));
 
         for (CreateOutboundOrderLineRequest lineRequest : request.lines()) {
             Item item = itemRepository.findById(lineRequest.itemId())
@@ -75,7 +76,7 @@ public class OutboundOrderService {
     }
 
     @Transactional
-    public OutboundOrder post(Long id) {
+    public OutboundOrder post(Long id, String operator) {
         OutboundOrder order = getById(id);
 
         if (order.getStatus() == OutboundOrderStatus.POSTED) {
@@ -95,12 +96,18 @@ public class OutboundOrderService {
                     MovementType.OUT,
                     line.getQuantity(),
                     null,
-                    "outbound-order:" + order.getId()
+                    "outbound-order:" + order.getId(),
+                    normalizeOperator(operator)
             );
         }
 
         order.setStatus(OutboundOrderStatus.POSTED);
+        order.setPostedBy(normalizeOperator(operator));
         order.setPostedAt(Instant.now());
         return outboundOrderRepository.save(order);
+    }
+
+    private String normalizeOperator(String operator) {
+        return (operator == null || operator.isBlank()) ? "system" : operator.trim();
     }
 }

@@ -8,6 +8,8 @@ public record InboundOrderResponse(
         Long warehouseId,
         String warehouseName,
         String status,
+        String createdBy,
+        String postedBy,
         Instant createdAt,
         Instant postedAt,
         List<InboundOrderLineResponse> lines

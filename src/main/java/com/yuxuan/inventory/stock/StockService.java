@@ -52,7 +52,6 @@ public class StockService {
         return stockRepository.findAll();
     }
 
-
     public long getAvailableQuantity(Long warehouseId, Long itemId) {
         return stockRepository.findByWarehouseIdAndItemId(warehouseId, itemId)
                 .map(Stock::getQuantity)
@@ -69,6 +68,11 @@ public class StockService {
 
     @Transactional
     public void applyMovement(Long warehouseId, Long itemId, MovementType type, Long quantity, Long delta, String reason) {
+        applyMovement(warehouseId, itemId, type, quantity, delta, reason, "system");
+    }
+
+    @Transactional
+    public void applyMovement(Long warehouseId, Long itemId, MovementType type, Long quantity, Long delta, String reason, String operator) {
         Warehouse warehouse = warehouseRepository.findById(warehouseId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Warehouse not found"));
         Item item = itemRepository.findById(itemId)
@@ -99,6 +103,8 @@ public class StockService {
         movement.setDelta(realDelta);
         movement.setReason((reason == null || reason.isBlank()) ? "manual" : reason);
         movement.setStatus(MovementStatus.POSTED);
+        movement.setCreatedBy(normalizeOperator(operator));
+        movement.setPostedBy(normalizeOperator(operator));
         movement.setPostedAt(Instant.now());
         stockMovementRepository.save(movement);
     }
@@ -144,5 +150,9 @@ public class StockService {
             throw new ApiException(HttpStatus.BAD_REQUEST, message);
         }
         return value;
+    }
+
+    private String normalizeOperator(String operator) {
+        return (operator == null || operator.isBlank()) ? "system" : operator.trim();
     }
 }

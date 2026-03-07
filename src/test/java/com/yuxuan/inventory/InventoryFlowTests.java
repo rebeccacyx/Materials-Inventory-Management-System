@@ -45,16 +45,19 @@ class InventoryFlowTests {
 
         mockMvc.perform(post("/stock-movements")
                         .header("X-Role", "OPERATOR")
+                        .header("X-Operator", "tester-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"warehouseId":1,"itemId":1,"type":"IN","quantity":10,"reason":"init"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("DRAFT"));
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.createdBy").value("tester-a"));
 
-        mockMvc.perform(post("/stock-movements/1/post").header("X-Role", "ADMIN"))
+        mockMvc.perform(post("/stock-movements/1/post").header("X-Role", "ADMIN").header("X-Operator", "tester-b"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("POSTED"));
+                .andExpect(jsonPath("$.status").value("POSTED"))
+                .andExpect(jsonPath("$.postedBy").value("tester-b"));
 
         mockMvc.perform(post("/outbound-orders")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -207,6 +210,7 @@ class InventoryFlowTests {
                 .andExpect(jsonPath("$.warehouseId").exists())
                 .andExpect(jsonPath("$.itemId").exists())
                 .andExpect(jsonPath("$.type").value("IN"))
+                .andExpect(jsonPath("$.createdBy").exists())
                 .andReturn();
 
         Integer movementId = JsonPath.read(movement.getResponse().getContentAsString(), "$.id");

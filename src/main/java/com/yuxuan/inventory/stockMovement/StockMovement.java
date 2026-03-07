@@ -36,6 +36,15 @@ public class StockMovement {
     @Column(nullable = false)
     private MovementStatus status;
 
+    @Column(name = "created_by", nullable = false, length = 64)
+    private String createdBy;
+
+    @Column(name = "posted_by", length = 64)
+    private String postedBy;
+
+    @Column(name = "cancelled_by", length = 64)
+    private String cancelledBy;
+
     @Column(name = "idempotency_key", length = 128)
     private String idempotencyKey;
 
@@ -67,6 +76,12 @@ public class StockMovement {
     public Instant getCreatedAt() { return createdAt; }
     public MovementStatus getStatus() { return status; }
     public void setStatus(MovementStatus status) { this.status = status; }
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+    public String getPostedBy() { return postedBy; }
+    public void setPostedBy(String postedBy) { this.postedBy = postedBy; }
+    public String getCancelledBy() { return cancelledBy; }
+    public void setCancelledBy(String cancelledBy) { this.cancelledBy = cancelledBy; }
     public String getIdempotencyKey() { return idempotencyKey; }
     public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
     public Instant getPostedAt() { return postedAt; }

@@ -43,7 +43,7 @@ public class StockMovementService {
     }
 
     @Transactional
-    public StockMovement createDraft(CreateStockMovementRequest request, String idempotencyKey, UserRole role) {
+    public StockMovement createDraft(CreateStockMovementRequest request, String idempotencyKey, UserRole role, String operator) {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             IdempotencyRecord existing = idempotencyRecordRepository.findByRequestKey(idempotencyKey).orElse(null);
             if (existing != null) {
@@ -64,6 +64,7 @@ public class StockMovementService {
         movement.setDelta(stockService.resolveDelta(request.type(), request.quantity(), request.delta()));
         movement.setReason((request.reason() == null || request.reason().isBlank()) ? "manual" : request.reason());
         movement.setStatus(MovementStatus.DRAFT);
+        movement.setCreatedBy(normalizeOperator(operator));
         movement.setIdempotencyKey(idempotencyKey);
 
         StockMovement saved = stockMovementRepository.save(movement);
@@ -79,7 +80,6 @@ public class StockMovementService {
         return saved;
     }
 
-
     public List<StockMovement> query(Long warehouseId, Long itemId, MovementStatus status, MovementType type) {
         return stockMovementRepository.findAllByOrderByCreatedAtDesc().stream()
                 .filter(m -> warehouseId == null || m.getWarehouse().getId().equals(warehouseId))
@@ -90,7 +90,7 @@ public class StockMovementService {
     }
 
     @Transactional
-    public StockMovement post(Long movementId, UserRole role) {
+    public StockMovement post(Long movementId, UserRole role, String operator) {
         StockMovement movement = stockMovementRepository.findById(movementId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Stock movement not found"));
 
@@ -111,6 +111,7 @@ public class StockMovementService {
 
         stockService.applyDraftMovement(movement);
         movement.setStatus(MovementStatus.POSTED);
+        movement.setPostedBy(normalizeOperator(operator));
         movement.setPostedAt(Instant.now());
         StockMovement saved = stockMovementRepository.save(movement);
         operationLogService.log("POST", "STOCK_MOVEMENT", saved.getId(), role, "SUCCESS", "movement posted");
@@ -118,7 +119,7 @@ public class StockMovementService {
     }
 
     @Transactional
-    public StockMovement cancel(Long movementId, UserRole role) {
+    public StockMovement cancel(Long movementId, UserRole role, String operator) {
         StockMovement movement = stockMovementRepository.findById(movementId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Stock movement not found"));
 
@@ -130,9 +131,14 @@ public class StockMovementService {
         }
 
         movement.setStatus(MovementStatus.CANCELLED);
+        movement.setCancelledBy(normalizeOperator(operator));
         movement.setCancelledAt(Instant.now());
         StockMovement saved = stockMovementRepository.save(movement);
         operationLogService.log("CANCEL", "STOCK_MOVEMENT", saved.getId(), role, "SUCCESS", "movement cancelled");
         return saved;
+    }
+
+    private String normalizeOperator(String operator) {
+        return (operator == null || operator.isBlank()) ? "system" : operator.trim();
     }
 }

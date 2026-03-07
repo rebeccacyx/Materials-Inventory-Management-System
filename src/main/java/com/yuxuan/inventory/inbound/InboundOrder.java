@@ -24,6 +24,12 @@ public class InboundOrder {
     @Column(nullable = false)
     private InboundOrderStatus status;
 
+    @Column(name = "created_by", nullable = false, length = 64)
+    private String createdBy;
+
+    @Column(name = "posted_by", length = 64)
+    private String postedBy;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -47,6 +53,10 @@ public class InboundOrder {
     public void setWarehouse(Warehouse warehouse) { this.warehouse = warehouse; }
     public InboundOrderStatus getStatus() { return status; }
     public void setStatus(InboundOrderStatus status) { this.status = status; }
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+    public String getPostedBy() { return postedBy; }
+    public void setPostedBy(String postedBy) { this.postedBy = postedBy; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getPostedAt() { return postedAt; }
     public void setPostedAt(Instant postedAt) { this.postedAt = postedAt; }

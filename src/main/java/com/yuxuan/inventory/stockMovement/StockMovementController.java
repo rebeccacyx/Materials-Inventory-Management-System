@@ -27,23 +27,26 @@ public class StockMovementController {
     @ResponseStatus(HttpStatus.CREATED)
     public StockMovementResponse createDraft(@Valid @RequestBody CreateStockMovementRequest request,
                                              @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
-                                             @RequestHeader(value = "X-Role", required = false) String roleHeader) {
+                                             @RequestHeader(value = "X-Role", required = false) String roleHeader,
+                                             @RequestHeader(value = "X-Operator", required = false) String operator) {
         UserRole role = roleGuardService.requireStockMutationRole(roleHeader);
-        return toResponse(stockMovementService.createDraft(request, idempotencyKey, role));
+        return toResponse(stockMovementService.createDraft(request, idempotencyKey, role, operator));
     }
 
     @PostMapping("/{id}/post")
     public StockMovementResponse post(@PathVariable Long id,
-                                      @RequestHeader(value = "X-Role", required = false) String roleHeader) {
+                                      @RequestHeader(value = "X-Role", required = false) String roleHeader,
+                                      @RequestHeader(value = "X-Operator", required = false) String operator) {
         UserRole role = roleGuardService.requireStockMutationRole(roleHeader);
-        return toResponse(stockMovementService.post(id, role));
+        return toResponse(stockMovementService.post(id, role, operator));
     }
 
     @PostMapping("/{id}/cancel")
     public StockMovementResponse cancel(@PathVariable Long id,
-                                        @RequestHeader(value = "X-Role", required = false) String roleHeader) {
+                                        @RequestHeader(value = "X-Role", required = false) String roleHeader,
+                                        @RequestHeader(value = "X-Operator", required = false) String operator) {
         UserRole role = roleGuardService.requireStockMutationRole(roleHeader);
-        return toResponse(stockMovementService.cancel(id, role));
+        return toResponse(stockMovementService.cancel(id, role, operator));
     }
 
     @GetMapping
@@ -68,6 +71,9 @@ public class StockMovementController {
                 movement.getDelta(),
                 movement.getReason(),
                 movement.getStatus().name(),
+                movement.getCreatedBy(),
+                movement.getPostedBy(),
+                movement.getCancelledBy(),
                 movement.getIdempotencyKey(),
                 movement.getCreatedAt(),
                 movement.getPostedAt(),

@@ -33,13 +33,14 @@ public class InboundOrderService {
     }
 
     @Transactional
-    public InboundOrder create(CreateInboundOrderRequest request) {
+    public InboundOrder create(CreateInboundOrderRequest request, String operator) {
         Warehouse warehouse = warehouseRepository.findById(request.warehouseId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Warehouse not found"));
 
         InboundOrder order = new InboundOrder();
         order.setWarehouse(warehouse);
         order.setStatus(InboundOrderStatus.DRAFT);
+        order.setCreatedBy(normalizeOperator(operator));
 
         for (CreateInboundOrderLineRequest lineRequest : request.lines()) {
             Item item = itemRepository.findById(lineRequest.itemId())
@@ -53,7 +54,6 @@ public class InboundOrderService {
 
         return inboundOrderRepository.save(order);
     }
-
 
     public List<InboundOrder> query(Long warehouseId, InboundOrderStatus status) {
         if (warehouseId != null && status != null) {
@@ -74,7 +74,7 @@ public class InboundOrderService {
     }
 
     @Transactional
-    public InboundOrder post(Long id) {
+    public InboundOrder post(Long id, String operator) {
         InboundOrder order = getById(id);
 
         if (order.getStatus() == InboundOrderStatus.POSTED) {
@@ -88,12 +88,18 @@ public class InboundOrderService {
                     MovementType.IN,
                     line.getQuantity(),
                     null,
-                    "inbound-order:" + order.getId()
+                    "inbound-order:" + order.getId(),
+                    normalizeOperator(operator)
             );
         }
 
         order.setStatus(InboundOrderStatus.POSTED);
+        order.setPostedBy(normalizeOperator(operator));
         order.setPostedAt(Instant.now());
         return inboundOrderRepository.save(order);
+    }
+
+    private String normalizeOperator(String operator) {
+        return (operator == null || operator.isBlank()) ? "system" : operator.trim();
     }
 }

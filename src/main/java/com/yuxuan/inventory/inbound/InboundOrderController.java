@@ -20,8 +20,9 @@ public class InboundOrderController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public InboundOrderResponse create(@Valid @RequestBody CreateInboundOrderRequest request) {
-        return toResponse(inboundOrderService.create(request));
+    public InboundOrderResponse create(@Valid @RequestBody CreateInboundOrderRequest request,
+                                       @RequestHeader(value = "X-Operator", required = false) String operator) {
+        return toResponse(inboundOrderService.create(request, operator));
     }
 
     @GetMapping
@@ -36,8 +37,9 @@ public class InboundOrderController {
     }
 
     @PostMapping("/{id}/post")
-    public InboundOrderResponse post(@PathVariable Long id) {
-        return toResponse(inboundOrderService.post(id));
+    public InboundOrderResponse post(@PathVariable Long id,
+                                     @RequestHeader(value = "X-Operator", required = false) String operator) {
+        return toResponse(inboundOrderService.post(id, operator));
     }
 
     private InboundOrderResponse toResponse(InboundOrder order) {
@@ -46,6 +48,8 @@ public class InboundOrderController {
                 order.getWarehouse().getId(),
                 order.getWarehouse().getName(),
                 order.getStatus().name(),
+                order.getCreatedBy(),
+                order.getPostedBy(),
                 order.getCreatedAt(),
                 order.getPostedAt(),
                 order.getLines().stream()
