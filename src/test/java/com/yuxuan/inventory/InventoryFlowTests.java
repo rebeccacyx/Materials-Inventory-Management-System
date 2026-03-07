@@ -166,6 +166,21 @@ class InventoryFlowTests {
                 .andExpect(jsonPath("$.quantity").value(8));
     }
 
+
+    @Test
+    void shouldReturnValidationErrorDetails() throws Exception {
+        mockMvc.perform(post("/items")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"","name":"Item","unit":"PCS"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.details.validationErrors").isArray())
+                .andExpect(jsonPath("$.details.validationErrors[0].field").exists())
+                .andExpect(jsonPath("$.details.validationErrors[0].message").exists());
+    }
+
     @Test
     void shouldReturnUnifiedErrorFormat() throws Exception {
         mockMvc.perform(get("/items/999"))
@@ -173,6 +188,7 @@ class InventoryFlowTests {
                 .andExpect(jsonPath("$.timestamp").exists())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
                 .andExpect(jsonPath("$.message").value("Item not found"))
                 .andExpect(jsonPath("$.path").value("/items/999"));
     }
