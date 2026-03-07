@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
+import java.util.List;
+
 public interface OutboundOrderRepository extends JpaRepository<OutboundOrder, Long> {
     List<OutboundOrder> findByWarehouseId(Long warehouseId);
     List<OutboundOrder> findByStatus(OutboundOrderStatus status);
