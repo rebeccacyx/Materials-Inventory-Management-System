@@ -1,8 +1,9 @@
-package com.yuxuan.inventory.outbound;
+package com.yuxuan.inventory.inbound;
 
 import com.yuxuan.inventory.common.ApiException;
 import com.yuxuan.inventory.item.Item;
 import com.yuxuan.inventory.item.ItemRepository;
+import com.yuxuan.inventory.stock.StockService;
 import com.yuxuan.inventory.stockMovement.MovementType;
 import com.yuxuan.inventory.warehouse.Warehouse;
 import com.yuxuan.inventory.warehouse.WarehouseRepository;
@@ -14,85 +15,85 @@ import java.time.Instant;
 import java.util.List;
 
 @Service
-public class OutboundOrderService {
+public class InboundOrderService {
 
-    private final OutboundOrderRepository outboundOrderRepository;
+    private final InboundOrderRepository inboundOrderRepository;
     private final WarehouseRepository warehouseRepository;
     private final ItemRepository itemRepository;
-    private final com.yuxuan.inventory.stock.StockService stockService;
+    private final StockService stockService;
 
-    public OutboundOrderService(OutboundOrderRepository outboundOrderRepository,
-                                WarehouseRepository warehouseRepository,
-                                ItemRepository itemRepository,
-                                com.yuxuan.inventory.stock.StockService stockService) {
-        this.outboundOrderRepository = outboundOrderRepository;
+    public InboundOrderService(InboundOrderRepository inboundOrderRepository,
+                               WarehouseRepository warehouseRepository,
+                               ItemRepository itemRepository,
+                               StockService stockService) {
+        this.inboundOrderRepository = inboundOrderRepository;
         this.warehouseRepository = warehouseRepository;
         this.itemRepository = itemRepository;
         this.stockService = stockService;
     }
 
     @Transactional
-    public OutboundOrder create(CreateOutboundOrderRequest request) {
+    public InboundOrder create(CreateInboundOrderRequest request) {
         Warehouse warehouse = warehouseRepository.findById(request.warehouseId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Warehouse not found"));
 
-        OutboundOrder order = new OutboundOrder();
+        InboundOrder order = new InboundOrder();
         order.setWarehouse(warehouse);
-        order.setStatus(OutboundOrderStatus.DRAFT);
+        order.setStatus(InboundOrderStatus.DRAFT);
 
-        for (CreateOutboundOrderLineRequest lineRequest : request.lines()) {
+        for (CreateInboundOrderLineRequest lineRequest : request.lines()) {
             Item item = itemRepository.findById(lineRequest.itemId())
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Item not found"));
-            OutboundOrderLine line = new OutboundOrderLine();
+            InboundOrderLine line = new InboundOrderLine();
             line.setOrder(order);
             line.setItem(item);
             line.setQuantity(lineRequest.quantity());
             order.getLines().add(line);
         }
 
-        return outboundOrderRepository.save(order);
+        return inboundOrderRepository.save(order);
     }
 
 
-    public List<OutboundOrder> query(Long warehouseId, OutboundOrderStatus status) {
+    public List<InboundOrder> query(Long warehouseId, InboundOrderStatus status) {
         if (warehouseId != null && status != null) {
-            return outboundOrderRepository.findByWarehouseIdAndStatus(warehouseId, status);
+            return inboundOrderRepository.findByWarehouseIdAndStatus(warehouseId, status);
         }
         if (warehouseId != null) {
-            return outboundOrderRepository.findByWarehouseId(warehouseId);
+            return inboundOrderRepository.findByWarehouseId(warehouseId);
         }
         if (status != null) {
-            return outboundOrderRepository.findByStatus(status);
+            return inboundOrderRepository.findByStatus(status);
         }
-        return outboundOrderRepository.findAll();
+        return inboundOrderRepository.findAll();
     }
 
-    public OutboundOrder getById(Long id) {
-        return outboundOrderRepository.findById(id)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Outbound order not found"));
+    public InboundOrder getById(Long id) {
+        return inboundOrderRepository.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Inbound order not found"));
     }
 
     @Transactional
-    public OutboundOrder post(Long id) {
-        OutboundOrder order = getById(id);
+    public InboundOrder post(Long id) {
+        InboundOrder order = getById(id);
 
-        if (order.getStatus() == OutboundOrderStatus.POSTED) {
+        if (order.getStatus() == InboundOrderStatus.POSTED) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Order already posted");
         }
 
-        for (OutboundOrderLine line : order.getLines()) {
+        for (InboundOrderLine line : order.getLines()) {
             stockService.applyMovement(
                     order.getWarehouse().getId(),
                     line.getItem().getId(),
-                    MovementType.OUT,
+                    MovementType.IN,
                     line.getQuantity(),
                     null,
-                    "outbound-order:" + order.getId()
+                    "inbound-order:" + order.getId()
             );
         }
 
-        order.setStatus(OutboundOrderStatus.POSTED);
+        order.setStatus(InboundOrderStatus.POSTED);
         order.setPostedAt(Instant.now());
-        return outboundOrderRepository.save(order);
+        return inboundOrderRepository.save(order);
     }
 }
