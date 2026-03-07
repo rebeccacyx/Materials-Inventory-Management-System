@@ -3,6 +3,7 @@ package com.yuxuan.inventory.outbound;
 import com.yuxuan.inventory.common.ApiException;
 import com.yuxuan.inventory.item.Item;
 import com.yuxuan.inventory.item.ItemRepository;
+import com.yuxuan.inventory.stock.StockService;
 import com.yuxuan.inventory.stockMovement.MovementType;
 import com.yuxuan.inventory.warehouse.Warehouse;
 import com.yuxuan.inventory.warehouse.WarehouseRepository;
@@ -11,6 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class OutboundOrderService {
@@ -18,12 +22,12 @@ public class OutboundOrderService {
     private final OutboundOrderRepository outboundOrderRepository;
     private final WarehouseRepository warehouseRepository;
     private final ItemRepository itemRepository;
-    private final com.yuxuan.inventory.stock.StockService stockService;
+    private final StockService stockService;
 
     public OutboundOrderService(OutboundOrderRepository outboundOrderRepository,
                                 WarehouseRepository warehouseRepository,
                                 ItemRepository itemRepository,
-                                com.yuxuan.inventory.stock.StockService stockService) {
+                                StockService stockService) {
         this.outboundOrderRepository = outboundOrderRepository;
         this.warehouseRepository = warehouseRepository;
         this.itemRepository = itemRepository;
@@ -52,6 +56,19 @@ public class OutboundOrderService {
         return outboundOrderRepository.save(order);
     }
 
+    public List<OutboundOrder> query(Long warehouseId, OutboundOrderStatus status) {
+        if (warehouseId != null && status != null) {
+            return outboundOrderRepository.findByWarehouseIdAndStatus(warehouseId, status);
+        }
+        if (warehouseId != null) {
+            return outboundOrderRepository.findByWarehouseId(warehouseId);
+        }
+        if (status != null) {
+            return outboundOrderRepository.findByStatus(status);
+        }
+        return outboundOrderRepository.findAll();
+    }
+
     public OutboundOrder getById(Long id) {
         return outboundOrderRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Outbound order not found"));
@@ -63,6 +80,12 @@ public class OutboundOrderService {
 
         if (order.getStatus() == OutboundOrderStatus.POSTED) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Order already posted");
+        }
+
+        Map<Long, Long> requiredByItem = order.getLines().stream()
+                .collect(Collectors.groupingBy(line -> line.getItem().getId(), Collectors.summingLong(OutboundOrderLine::getQuantity)));
+        for (Map.Entry<Long, Long> entry : requiredByItem.entrySet()) {
+            stockService.ensureSufficientStock(order.getWarehouse().getId(), entry.getKey(), entry.getValue());
         }
 
         for (OutboundOrderLine line : order.getLines()) {

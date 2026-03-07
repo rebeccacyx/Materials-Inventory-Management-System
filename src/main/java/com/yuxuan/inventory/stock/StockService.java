@@ -3,6 +3,7 @@ package com.yuxuan.inventory.stock;
 import com.yuxuan.inventory.common.ApiException;
 import com.yuxuan.inventory.item.Item;
 import com.yuxuan.inventory.item.ItemRepository;
+import com.yuxuan.inventory.stockMovement.MovementStatus;
 import com.yuxuan.inventory.stockMovement.MovementType;
 import com.yuxuan.inventory.stockMovement.StockMovement;
 import com.yuxuan.inventory.stockMovement.StockMovementRepository;
@@ -12,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -50,6 +52,21 @@ public class StockService {
         return stockRepository.findAll();
     }
 
+
+    public long getAvailableQuantity(Long warehouseId, Long itemId) {
+        return stockRepository.findByWarehouseIdAndItemId(warehouseId, itemId)
+                .map(Stock::getQuantity)
+                .orElse(0L);
+    }
+
+    public void ensureSufficientStock(Long warehouseId, Long itemId, long requiredQuantity) {
+        long available = getAvailableQuantity(warehouseId, itemId);
+        if (requiredQuantity > available) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Stock not sufficient: itemId=" + itemId + ", required=" + requiredQuantity + ", available=" + available);
+        }
+    }
+
     @Transactional
     public void applyMovement(Long warehouseId, Long itemId, MovementType type, Long quantity, Long delta, String reason) {
         Warehouse warehouse = warehouseRepository.findById(warehouseId)
@@ -81,10 +98,35 @@ public class StockService {
         movement.setType(type);
         movement.setDelta(realDelta);
         movement.setReason((reason == null || reason.isBlank()) ? "manual" : reason);
+        movement.setStatus(MovementStatus.POSTED);
+        movement.setPostedAt(Instant.now());
         stockMovementRepository.save(movement);
     }
 
-    private long resolveDelta(MovementType type, Long quantity, Long delta) {
+    @Transactional
+    public void applyDraftMovement(StockMovement movement) {
+        Long warehouseId = movement.getWarehouse().getId();
+        Long itemId = movement.getItem().getId();
+
+        Stock stock = stockRepository.findByWarehouseIdAndItemId(warehouseId, itemId)
+                .orElseGet(() -> {
+                    Stock s = new Stock();
+                    s.setWarehouse(movement.getWarehouse());
+                    s.setItem(movement.getItem());
+                    s.setQuantity(0);
+                    return s;
+                });
+
+        long newQty = stock.getQuantity() + movement.getDelta();
+        if (newQty < 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Stock not sufficient");
+        }
+
+        stock.setQuantity(newQty);
+        stockRepository.save(stock);
+    }
+
+    public long resolveDelta(MovementType type, Long quantity, Long delta) {
         return switch (type) {
             case IN -> requirePositive(quantity, "quantity is required for IN");
             case OUT -> -requirePositive(quantity, "quantity is required for OUT");
