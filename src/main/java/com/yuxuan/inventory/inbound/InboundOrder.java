@@ -1,4 +1,4 @@
-package com.yuxuan.inventory.outbound;
+package com.yuxuan.inventory.inbound;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.yuxuan.inventory.warehouse.Warehouse;
@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "outbound_orders")
-public class OutboundOrder {
+@Table(name = "inbound_orders")
+public class InboundOrder {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,7 +22,7 @@ public class OutboundOrder {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private OutboundOrderStatus status;
+    private InboundOrderStatus status;
 
     @Column(name = "created_by", nullable = false, length = 64)
     private String createdBy;
@@ -38,21 +38,21 @@ public class OutboundOrder {
 
     @JsonManagedReference
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<OutboundOrderLine> lines = new ArrayList<>();
+    private List<InboundOrderLine> lines = new ArrayList<>();
 
     @PrePersist
     public void prePersist() {
         createdAt = Instant.now();
         if (status == null) {
-            status = OutboundOrderStatus.DRAFT;
+            status = InboundOrderStatus.DRAFT;
         }
     }
 
     public Long getId() { return id; }
     public Warehouse getWarehouse() { return warehouse; }
     public void setWarehouse(Warehouse warehouse) { this.warehouse = warehouse; }
-    public OutboundOrderStatus getStatus() { return status; }
-    public void setStatus(OutboundOrderStatus status) { this.status = status; }
+    public InboundOrderStatus getStatus() { return status; }
+    public void setStatus(InboundOrderStatus status) { this.status = status; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public String getPostedBy() { return postedBy; }
@@ -60,5 +60,5 @@ public class OutboundOrder {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getPostedAt() { return postedAt; }
     public void setPostedAt(Instant postedAt) { this.postedAt = postedAt; }
-    public List<OutboundOrderLine> getLines() { return lines; }
+    public List<InboundOrderLine> getLines() { return lines; }
 }
