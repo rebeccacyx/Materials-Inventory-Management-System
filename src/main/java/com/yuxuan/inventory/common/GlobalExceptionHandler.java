@@ -38,4 +38,15 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         ));
     }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse(
+                Instant.now(),
+                500,
+                "Internal Server Error",
+                ex.getMessage() == null ? "Unexpected error" : ex.getMessage(),
+                request.getRequestURI()
+        ));
+    }
 }
