@@ -3,6 +3,7 @@ package com.yuxuan.inventory.stockMovement;
 import com.yuxuan.inventory.security.RoleGuardService;
 import com.yuxuan.inventory.security.UserRole;
 import com.yuxuan.inventory.stockMovement.dto.CreateStockMovementRequest;
+import com.yuxuan.inventory.stockMovement.dto.StockMovementResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -14,42 +15,63 @@ import java.util.List;
 public class StockMovementController {
 
     private final StockMovementService stockMovementService;
-    private final StockMovementRepository stockMovementRepository;
     private final RoleGuardService roleGuardService;
 
     public StockMovementController(StockMovementService stockMovementService,
-                                   StockMovementRepository stockMovementRepository,
                                    RoleGuardService roleGuardService) {
         this.stockMovementService = stockMovementService;
-        this.stockMovementRepository = stockMovementRepository;
         this.roleGuardService = roleGuardService;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public StockMovement createDraft(@Valid @RequestBody CreateStockMovementRequest request,
-                                     @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
-                                     @RequestHeader(value = "X-Role", required = false) String roleHeader) {
+    public StockMovementResponse createDraft(@Valid @RequestBody CreateStockMovementRequest request,
+                                             @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+                                             @RequestHeader(value = "X-Role", required = false) String roleHeader) {
         UserRole role = roleGuardService.requireStockMutationRole(roleHeader);
-        return stockMovementService.createDraft(request, idempotencyKey, role);
+        return toResponse(stockMovementService.createDraft(request, idempotencyKey, role));
     }
 
     @PostMapping("/{id}/post")
-    public StockMovement post(@PathVariable Long id,
-                              @RequestHeader(value = "X-Role", required = false) String roleHeader) {
+    public StockMovementResponse post(@PathVariable Long id,
+                                      @RequestHeader(value = "X-Role", required = false) String roleHeader) {
         UserRole role = roleGuardService.requireStockMutationRole(roleHeader);
-        return stockMovementService.post(id, role);
+        return toResponse(stockMovementService.post(id, role));
     }
 
     @PostMapping("/{id}/cancel")
-    public StockMovement cancel(@PathVariable Long id,
-                                @RequestHeader(value = "X-Role", required = false) String roleHeader) {
+    public StockMovementResponse cancel(@PathVariable Long id,
+                                        @RequestHeader(value = "X-Role", required = false) String roleHeader) {
         UserRole role = roleGuardService.requireStockMutationRole(roleHeader);
-        return stockMovementService.cancel(id, role);
+        return toResponse(stockMovementService.cancel(id, role));
     }
 
     @GetMapping
-    public List<StockMovement> list() {
-        return stockMovementRepository.findAllByOrderByCreatedAtDesc();
+    public List<StockMovementResponse> list(@RequestParam(required = false) Long warehouseId,
+                                            @RequestParam(required = false) Long itemId,
+                                            @RequestParam(required = false) MovementStatus status,
+                                            @RequestParam(required = false) MovementType type) {
+        return stockMovementService.query(warehouseId, itemId, status, type)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private StockMovementResponse toResponse(StockMovement movement) {
+        return new StockMovementResponse(
+                movement.getId(),
+                movement.getWarehouse().getId(),
+                movement.getWarehouse().getName(),
+                movement.getItem().getId(),
+                movement.getItem().getSku(),
+                movement.getType().name(),
+                movement.getDelta(),
+                movement.getReason(),
+                movement.getStatus().name(),
+                movement.getIdempotencyKey(),
+                movement.getCreatedAt(),
+                movement.getPostedAt(),
+                movement.getCancelledAt()
+        );
     }
 }

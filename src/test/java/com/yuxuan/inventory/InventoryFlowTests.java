@@ -167,6 +167,61 @@ class InventoryFlowTests {
     }
 
 
+
+    @Test
+    void shouldSupportQueryEndpointsAndResponseDto() throws Exception {
+        mockMvc.perform(get("/outbound-orders"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+
+        mockMvc.perform(get("/inbound-orders"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+
+        MvcResult warehouse = mockMvc.perform(post("/warehouses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"W-Q","location":"HZ"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        MvcResult item = mockMvc.perform(post("/items")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"SKU-Q-1","name":"Item Q1","unit":"PCS"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        Long warehouseId = JsonPath.read(warehouse.getResponse().getContentAsString(), "$.id");
+        Long itemId = JsonPath.read(item.getResponse().getContentAsString(), "$.id");
+
+        MvcResult movement = mockMvc.perform(post("/stock-movements")
+                        .header("X-Role", "OPERATOR")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"warehouseId":%d,"itemId":%d,"type":"IN","quantity":1,"reason":"q"}
+                                """.formatted(warehouseId, itemId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.warehouseId").exists())
+                .andExpect(jsonPath("$.itemId").exists())
+                .andExpect(jsonPath("$.type").value("IN"))
+                .andReturn();
+
+        Integer movementId = JsonPath.read(movement.getResponse().getContentAsString(), "$.id");
+
+        mockMvc.perform(get("/stock-movements")
+                        .param("status", "DRAFT")
+                        .param("type", "IN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+
+        mockMvc.perform(post("/stock-movements/{id}/cancel", movementId).header("X-Role", "ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
     @Test
     void shouldReturnValidationErrorDetails() throws Exception {
         mockMvc.perform(post("/items")

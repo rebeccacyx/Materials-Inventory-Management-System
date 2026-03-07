@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 
 @Service
 public class StockMovementService {
@@ -76,6 +77,16 @@ public class StockMovementService {
 
         operationLogService.log("CREATE_DRAFT", "STOCK_MOVEMENT", saved.getId(), role, "SUCCESS", "movement draft created");
         return saved;
+    }
+
+
+    public List<StockMovement> query(Long warehouseId, Long itemId, MovementStatus status, MovementType type) {
+        return stockMovementRepository.findAllByOrderByCreatedAtDesc().stream()
+                .filter(m -> warehouseId == null || m.getWarehouse().getId().equals(warehouseId))
+                .filter(m -> itemId == null || m.getItem().getId().equals(itemId))
+                .filter(m -> status == null || m.getStatus() == status)
+                .filter(m -> type == null || m.getType() == type)
+                .toList();
     }
 
     @Transactional

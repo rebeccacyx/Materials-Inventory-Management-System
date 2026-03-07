@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 
 @Service
 public class OutboundOrderService {
@@ -50,6 +51,20 @@ public class OutboundOrderService {
         }
 
         return outboundOrderRepository.save(order);
+    }
+
+
+    public List<OutboundOrder> query(Long warehouseId, OutboundOrderStatus status) {
+        if (warehouseId != null && status != null) {
+            return outboundOrderRepository.findByWarehouseIdAndStatus(warehouseId, status);
+        }
+        if (warehouseId != null) {
+            return outboundOrderRepository.findByWarehouseId(warehouseId);
+        }
+        if (status != null) {
+            return outboundOrderRepository.findByStatus(status);
+        }
+        return outboundOrderRepository.findAll();
     }
 
     public OutboundOrder getById(Long id) {
