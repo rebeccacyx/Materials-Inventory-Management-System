@@ -52,6 +52,21 @@ public class StockService {
         return stockRepository.findAll();
     }
 
+
+    public long getAvailableQuantity(Long warehouseId, Long itemId) {
+        return stockRepository.findByWarehouseIdAndItemId(warehouseId, itemId)
+                .map(Stock::getQuantity)
+                .orElse(0L);
+    }
+
+    public void ensureSufficientStock(Long warehouseId, Long itemId, long requiredQuantity) {
+        long available = getAvailableQuantity(warehouseId, itemId);
+        if (requiredQuantity > available) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Stock not sufficient: itemId=" + itemId + ", required=" + requiredQuantity + ", available=" + available);
+        }
+    }
+
     @Transactional
     public void applyMovement(Long warehouseId, Long itemId, MovementType type, Long quantity, Long delta, String reason) {
         Warehouse warehouse = warehouseRepository.findById(warehouseId)

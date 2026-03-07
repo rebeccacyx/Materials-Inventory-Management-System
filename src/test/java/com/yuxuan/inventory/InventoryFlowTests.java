@@ -222,6 +222,137 @@ class InventoryFlowTests {
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
     }
 
+
+    @Test
+    void shouldRejectDuplicatePosting() throws Exception {
+        MvcResult warehouse = mockMvc.perform(post("/warehouses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"W-DUP","location":"SZ"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        MvcResult item = mockMvc.perform(post("/items")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"SKU-DUP-1","name":"Item Dup","unit":"PCS"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        Long warehouseId = JsonPath.read(warehouse.getResponse().getContentAsString(), "$.id");
+        Long itemId = JsonPath.read(item.getResponse().getContentAsString(), "$.id");
+
+        MvcResult inDraft = mockMvc.perform(post("/stock-movements")
+                        .header("X-Role", "OPERATOR")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"warehouseId":%d,"itemId":%d,"type":"IN","quantity":10}
+                                """.formatted(warehouseId, itemId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Integer inDraftId = JsonPath.read(inDraft.getResponse().getContentAsString(), "$.id");
+        mockMvc.perform(post("/stock-movements/{id}/post", inDraftId).header("X-Role", "ADMIN"))
+                .andExpect(status().isOk());
+
+        MvcResult outDraft = mockMvc.perform(post("/stock-movements")
+                        .header("X-Role", "OPERATOR")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"warehouseId":%d,"itemId":%d,"type":"OUT","quantity":2}
+                                """.formatted(warehouseId, itemId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Integer outDraftId = JsonPath.read(outDraft.getResponse().getContentAsString(), "$.id");
+
+        mockMvc.perform(post("/stock-movements/{id}/post", outDraftId).header("X-Role", "ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("POSTED"));
+
+        mockMvc.perform(post("/stock-movements/{id}/post", outDraftId).header("X-Role", "ADMIN"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Movement already posted"));
+
+        MvcResult inboundOrder = mockMvc.perform(post("/inbound-orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"warehouseId":%d,"lines":[{"itemId":%d,"quantity":3}]}
+                                """.formatted(warehouseId, itemId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Integer inboundId = JsonPath.read(inboundOrder.getResponse().getContentAsString(), "$.id");
+        mockMvc.perform(post("/inbound-orders/{id}/post", inboundId))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/inbound-orders/{id}/post", inboundId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Order already posted"));
+
+        MvcResult outboundOrder = mockMvc.perform(post("/outbound-orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"warehouseId":%d,"lines":[{"itemId":%d,"quantity":1}]}
+                                """.formatted(warehouseId, itemId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Integer outboundId = JsonPath.read(outboundOrder.getResponse().getContentAsString(), "$.id");
+        mockMvc.perform(post("/outbound-orders/{id}/post", outboundId))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/outbound-orders/{id}/post", outboundId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Order already posted"));
+    }
+
+    @Test
+    void shouldRejectWhenStockIsInsufficient() throws Exception {
+        MvcResult warehouse = mockMvc.perform(post("/warehouses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"W-NO-STOCK","location":"SZ"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        MvcResult item = mockMvc.perform(post("/items")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"SKU-NO-STOCK-1","name":"No Stock Item","unit":"PCS"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        Long warehouseId = JsonPath.read(warehouse.getResponse().getContentAsString(), "$.id");
+        Long itemId = JsonPath.read(item.getResponse().getContentAsString(), "$.id");
+
+        MvcResult outDraft = mockMvc.perform(post("/stock-movements")
+                        .header("X-Role", "OPERATOR")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"warehouseId":%d,"itemId":%d,"type":"OUT","quantity":1}
+                                """.formatted(warehouseId, itemId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        Integer outDraftId = JsonPath.read(outDraft.getResponse().getContentAsString(), "$.id");
+
+        mockMvc.perform(post("/stock-movements/{id}/post", outDraftId).header("X-Role", "ADMIN"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Stock not sufficient")));
+
+        MvcResult outboundOrder = mockMvc.perform(post("/outbound-orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"warehouseId":%d,"lines":[{"itemId":%d,"quantity":2}]}
+                                """.formatted(warehouseId, itemId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Integer outboundId = JsonPath.read(outboundOrder.getResponse().getContentAsString(), "$.id");
+
+        mockMvc.perform(post("/outbound-orders/{id}/post", outboundId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Stock not sufficient")));
+    }
+
     @Test
     void shouldReturnValidationErrorDetails() throws Exception {
         mockMvc.perform(post("/items")

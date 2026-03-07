@@ -98,7 +98,15 @@ public class StockMovementService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Cancelled movement cannot be posted");
         }
         if (movement.getStatus() == MovementStatus.POSTED) {
-            return movement;
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Movement already posted");
+        }
+
+        if (movement.getDelta() < 0) {
+            stockService.ensureSufficientStock(
+                    movement.getWarehouse().getId(),
+                    movement.getItem().getId(),
+                    -movement.getDelta()
+            );
         }
 
         stockService.applyDraftMovement(movement);
